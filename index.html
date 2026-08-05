@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Photic — Milestone Report</title>
+<style>
+  body { font-family: -apple-system, "Helvetica Neue", Arial, sans-serif; max-width: 820px; margin: 40px auto; padding: 0 20px; color: #1a1a1a; line-height: 1.5; }
+  h1 { font-size: 1.9em; margin-bottom: 0; }
+  .subtitle { color: #555; margin-top: 4px; }
+  .teamnames { font-weight: 600; margin: 6px 0 2px; }
+  .links { color: #333; margin: 2px 0 20px; }
+  h2 { border-bottom: 2px solid #1f77b4; padding-bottom: 3px; margin-top: 26px; font-size: 1.15em; }
+  p { margin: 8px 0; }
+  table { border-collapse: collapse; margin: 12px 0; font-size: 0.92em; }
+  th, td { border: 1px solid #ccc; padding: 4px 12px; text-align: right; }
+  th { background: #f0f4f8; }
+  td:first-child, th:first-child { text-align: left; }
+  code { background: #f0f0f0; padding: 1px 5px; border-radius: 3px; font-size: 0.9em; }
+  .imgrow { display: flex; gap: 14px; flex-wrap: wrap; margin: 12px 0; }
+  .imgrow figure { margin: 0; flex: 1; min-width: 240px; }
+  .imgrow { justify-content: center; align-items: flex-start; }
+  .imgrow figure { flex: 0 1 300px; }
+  .imgrow img { width: 100%; max-height: 185px; object-fit: contain; border: 1px solid #ddd; border-radius: 4px; }
+  figure.plot { text-align: center; }
+  figure.plot img { max-height: 215px; width: auto; max-width: 100%; border: 1px solid #ddd; border-radius: 4px; }
+  figcaption { font-size: 0.85em; color: #555; margin-top: 5px; text-align: center; }
+</style>
+</head>
+<body>
+
+<h1>Photic</h1>
+<div class="subtitle">A spectral volumetric path tracer for underwater light — Week 1 Milestone</div>
+<p class="teamnames">Zachary Liang &middot; Blair Xu &middot; CS 184, Summer 2026</p>
+<p class="links"><strong>Links:</strong>
+  <a href="https://youtu.be/IxARHU25cSw">1-minute video</a> &middot;
+  <a href="photic_milestone_slides.pptx">slides</a> &middot;
+  <a href="https://github.com/cal-cs184/hw-3-zach_and_blair">source code</a>
+</p>
+
+<h2>Summary</h2>
+<p>
+  Our Week 1 goal was a working grayscale water medium plus a Kd (attenuation coefficient) measurement
+  pipeline on top of our HW3 path tracer. We hit both, and went a step further: the medium already runs
+  in full per-channel RGB, and it gave us our first real result — measured attenuation coming out
+  <em>below</em> the naive single-scattering prediction on every channel, which is exactly the effect
+  the project set out to measure.
+</p>
+
+<h2>What we built</h2>
+<p>
+  A new <code>Medium</code> class models a homogeneous body of water: per-channel Beer-Lambert absorption,
+  wavelength-neutral scattering, analytic free-flight distance sampling (no ray-marching), and isotropic
+  phase sampling (the Week 1 baseline; Henyey-Greenstein is Week 2). Every ray checks whether it scatters
+  before hitting a surface. If it does, we do next-event estimation from the scatter point plus a
+  Russian-roulette recursive continuation, so multiple scattering emerges on its own rather than being
+  special-cased. The water volume is auto-derived from any scene's bounding box, so any HW3
+  <code>.dae</code> renders "underwater" with no new geometry (two flags: <code>-w</code> turbidity,
+  <code>-k</code> depth). With no water flag, the renderer is byte-for-byte HW3.
+</p>
+<p>
+  A small Python harness (<code>tools/photic_measure.py</code>) samples brightness from the renders, fits
+  Kd per channel by least squares, and compares it against the analytic prediction
+  <code>Kd = sigma_a + sigma_s</code>.
+</p>
+
+<h2>Result</h2>
+<p>
+  Rendering an empty Cornell box at turbidity 0.15 across increasing depth and fitting Kd per channel:
+</p>
+<table>
+<tr><th>channel</th><th>measured Kd</th><th>analytic Kd</th><th>reduction</th><th>scattering albedo</th></tr>
+<tr><td>R</td><td>0.333</td><td>0.500</td><td>33.5% lower</td><td>0.30</td></tr>
+<tr><td>G</td><td>0.131</td><td>0.200</td><td>34.3% lower</td><td>0.75</td></tr>
+<tr><td>B</td><td>0.105</td><td>0.165</td><td>36.1% lower</td><td>0.91</td></tr>
+</table>
+<p>
+  Measured Kd lands below the naive prediction on every channel — evidence that scattered photons
+  re-enter the beam instead of vanishing. The gap is largest for blue (mostly scattered) and smallest for
+  red (mostly absorbed); we never coded that ordering in, so it's a good sign the per-channel medium is
+  behaving correctly.
+</p>
+
+<div class="imgrow">
+  <figure>
+    <img src="images/photic/no_water.png" alt="Cornell box, no water">
+    <figcaption>No water (plain HW3)</figcaption>
+  </figure>
+  <figure>
+    <img src="images/photic/water_clean.png" alt="Cornell box with water">
+    <figcaption>With water, turbidity 0.15</figcaption>
+  </figure>
+</div>
+<figure class="plot">
+  <img src="images/photic/kd_plot.png" alt="Measured vs analytic Kd">
+  <figcaption>Left: log-intensity vs. depth per channel with fitted lines. Right: measured vs. analytic Kd.</figcaption>
+</figure>
+
+<h2>Progress vs. plan, and next week</h2>
+<p>
+  We met the Week 1 target and reached RGB early. Known simplifications, all within baseline scope:
+  scattering is isotropic; the "radiometer" reads pixel brightness rather than a true irradiance integral;
+  and the absorption coefficients are order-of-magnitude estimates rather than a digitized table. Week 2,
+  as planned: the Henyey-Greenstein phase function, per-channel extinction refinement, the Secchi-disk
+  scene and validation, and the convergence-vs-optical-depth study.
+</p>
+
+<h2>Team contributions</h2>
+<p>
+  Following the proposal's split, we built the medium infrastructure and the measurement harness in
+  parallel, then merged and verified them together against a working RGB medium render with a real Kd
+  readout ahead of the milestone deadline.
+</p>
+
+</body>
+</html>
