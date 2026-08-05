@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Photic — Milestone Report</title>
+<title>Photic Milestone Report</title>
 <style>
   body { font-family: -apple-system, "Helvetica Neue", Arial, sans-serif; max-width: 820px; margin: 40px auto; padding: 0 20px; color: #1a1a1a; line-height: 1.5; }
   h1 { font-size: 1.9em; margin-bottom: 0; }
@@ -29,7 +29,7 @@
 <body>
 
 <h1>Photic</h1>
-<div class="subtitle">A spectral volumetric path tracer for underwater light — Week 1 Milestone</div>
+<div class="subtitle">A spectral volumetric path tracer for underwater light. Week 1 milestone.</div>
 <p class="teamnames">Zachary Liang &middot; Blair Xu &middot; CS 184, Summer 2026</p>
 <p class="links"><strong>Links:</strong>
   <a href="https://youtu.be/IxARHU25cSw">1-minute video</a> &middot;
@@ -41,7 +41,7 @@
 <p>
   Our Week 1 goal was a working grayscale water medium plus a Kd (attenuation coefficient) measurement
   pipeline on top of our HW3 path tracer. We hit both, and went a step further: the medium already runs
-  in full per-channel RGB, and it gave us our first real result — measured attenuation coming out
+  in full per-channel RGB, and it gave us our first real result: measured attenuation coming out
   <em>below</em> the naive single-scattering prediction on every channel, which is exactly the effect
   the project set out to measure.
 </p>
@@ -74,8 +74,8 @@
 <tr><td>B</td><td>0.105</td><td>0.165</td><td>36.1% lower</td><td>0.91</td></tr>
 </table>
 <p>
-  Measured Kd lands below the naive prediction on every channel — evidence that scattered photons
-  re-enter the beam instead of vanishing. The gap is largest for blue (mostly scattered) and smallest for
+  Measured Kd lands below the naive prediction on every channel. That means scattered photons are
+  re-entering the beam instead of just vanishing. The gap is largest for blue (mostly scattered) and smallest for
   red (mostly absorbed); we never coded that ordering in, so it's a good sign the per-channel medium is
   behaving correctly.
 </p>
