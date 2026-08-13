@@ -1,0 +1,52 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 740 470" font-family="-apple-system, Helvetica Neue, Arial, sans-serif">
+  <defs>
+    <marker id="arw" markerWidth="10" markerHeight="10" refX="7" refY="3" orient="auto">
+      <path d="M0,0 L7,3 L0,6 z" fill="#5a7684"/>
+    </marker>
+  </defs>
+  <style>
+    .box{fill:#eef4f8;stroke:#1f77b4;stroke-width:1.5;}
+    .dec{fill:#dcebf5;stroke:#1f77b4;stroke-width:2;}
+    .t{fill:#16323f;font-size:14px;}
+    .tb{fill:#0f3a57;font-size:15px;font-weight:700;}
+    .lab{fill:#1f77b4;font-size:12px;font-weight:700;}
+    .ln{stroke:#5a7684;stroke-width:1.6;fill:none;}
+    .code{font-family:ui-monospace,Consolas,monospace;fill:#16323f;font-size:13px;}
+  </style>
+
+  <rect class="box" x="220" y="14" width="300" height="42" rx="8"/>
+  <text class="t" x="370" y="40" text-anchor="middle">Camera or bounce ray</text>
+  <line class="ln" x1="370" y1="56" x2="370" y2="78" marker-end="url(#arw)"/>
+
+  <rect class="box" x="220" y="80" width="300" height="42" rx="8"/>
+  <text class="t" x="370" y="106" text-anchor="middle">Intersect scene (BVH) and water box</text>
+  <line class="ln" x1="370" y1="122" x2="370" y2="144" marker-end="url(#arw)"/>
+
+  <rect class="box" x="220" y="146" width="300" height="48" rx="8"/>
+  <text class="t" x="370" y="168" text-anchor="middle">Sample free-flight distance</text>
+  <text class="code" x="370" y="186" text-anchor="middle">t = -ln(1-u) / sigma_t_hat</text>
+  <line class="ln" x1="370" y1="194" x2="370" y2="214" marker-end="url(#arw)"/>
+
+  <rect class="dec" x="230" y="216" width="280" height="52" rx="26"/>
+  <text class="tb" x="370" y="238" text-anchor="middle">Does the ray reach a surface</text>
+  <text class="tb" x="370" y="257" text-anchor="middle">before it scatters?</text>
+
+  <path class="ln" d="M300,264 C210,304 185,300 180,326" marker-end="url(#arw)"/>
+  <path class="ln" d="M440,264 C530,304 555,300 560,326" marker-end="url(#arw)"/>
+  <text class="lab" x="178" y="302" text-anchor="middle">no &#183; scatter</text>
+  <text class="lab" x="562" y="302" text-anchor="middle">yes &#183; survive</text>
+
+  <rect class="box" x="20" y="330" width="330" height="122" rx="8"/>
+  <text class="tb" x="42" y="360">Scatter in the water</text>
+  <text class="t" x="42" y="388">Next-event estimation with the</text>
+  <text class="t" x="42" y="410">HG phase function and transmittance,</text>
+  <text class="t" x="42" y="432">plus a Russian-roulette bounce that</text>
+  <text class="t" x="42" y="452" font-style="italic">... this is the multiple scattering</text>
+
+  <rect class="box" x="390" y="330" width="330" height="122" rx="8"/>
+  <text class="tb" x="412" y="360">Survive to the surface</text>
+  <text class="t" x="412" y="388">Run HW3's own surface shading,</text>
+  <text class="t" x="412" y="410">then attenuate by per-channel</text>
+  <text class="t" x="412" y="432">Beer-Lambert transmittance over</text>
+  <text class="t" x="412" y="452">the water segment</text>
+</svg>

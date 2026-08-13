@@ -95,6 +95,13 @@
   recursion rather than being special-cased. Russian roulette (fixed continuation probability) keeps the
   paths finite at high optical depth.
 </p>
+<figure>
+  <img src="images/photic/pipeline.svg" alt="medium path decision flow" style="max-width:560px;">
+  <figcaption>The medium path at a glance. Every ray samples a free-flight distance; if it scatters
+    before reaching a surface we do next-event estimation and a Russian-roulette bounce (which is where
+    multiple scattering comes from), otherwise the ordinary HW3 surface result is attenuated by
+    transmittance over the water segment.</figcaption>
+</figure>
 
 <h3>Henyey-Greenstein phase function</h3>
 <p>
@@ -165,6 +172,20 @@
 </ul>
 
 <h2>Results</h2>
+
+<h3>Starting point vs water medium</h3>
+<p>
+  The clearest way to see what the extension adds is to render the same scene with the medium off and on.
+  Left is stock Homework 3 (no water flag, the byte-for-byte original); right is the identical scene and
+  camera with the water medium enabled at turbidity 0.15, depth scale 4, g = 0.9. Red is absorbed fastest,
+  so the whole box shifts toward cyan; contrast flattens as scattering fills the shadows; and the forward
+  lobe puts a bright glow around the light. The bunny stays recognizable but loses saturation and edge
+  contrast, which is the underwater look the rest of this section quantifies.
+</p>
+<div class="imgrow">
+  <figure><img src="images/photic/bunny_dry.png" alt="bunny in stock Cornell box, no medium"><figcaption>Stock HW3, no medium.</figcaption></figure>
+  <figure><img src="images/photic/bunny_wet.png" alt="same bunny scene rendered underwater"><figcaption>Same scene and camera with the water medium (turbidity 0.15, depth 4, g = 0.9).</figcaption></figure>
+</div>
 
 <h3>Phase function: isotropic vs forward-scattering</h3>
 <p>
@@ -257,6 +278,11 @@
   in the least-absorbed band. The rendered disk agrees with the empirical Kd law.
 </p>
 <figure>
+  <img src="images/photic/secchi_transition.png" alt="Secchi disk fading with depth">
+  <figcaption>The black-and-white target across increasing depth: crisp at depth x1, washing out by x8,
+    and gone by x12. Contrast fades smoothly with depth rather than switching off at a single point.</figcaption>
+</figure>
+<figure>
   <img src="images/photic/secchi_contrast.png" alt="Secchi contrast vs depth">
   <figcaption>White-vs-black patch contrast falling with depth. The shaded band is the Secchi depth
     predicted from measured Kd (1.4 to 1.7 divided by Kd); the measured crossing lands inside it.</figcaption>
@@ -273,16 +299,15 @@
 </ul>
 
 <h2>Contributions</h2>
-<p>
-  <em>Draft split based on the proposal, please confirm and adjust before submission.</em>
-</p>
 <ul>
-  <li><strong>Zachary Liang</strong> led the rendering physics: the medium infrastructure, free-flight
-    distance sampling, transmittance, the Henyey-Greenstein phase function and its importance sampling
-    and validation, the per-channel correction, and the <code>-g</code> control.</li>
-  <li><strong>Blair Xu</strong> led the measurement and analysis: the underwater test scene, the Kd
-    fitting and turbidity sweep, the convergence study, the Secchi relation, and the plotting pipeline.</li>
-  <li>Both members merged and verified the two halves together and produced the report, demo, and video.</li>
+  <li><strong>Zachary Liang</strong> built the rendering physics: the medium infrastructure, free-flight
+    distance sampling, transmittance, the Henyey-Greenstein phase function with its importance sampling
+    and validation, the per-channel chromatic correction, and the <code>-g</code> control.</li>
+  <li><strong>Blair Xu</strong> built the measurement and analysis: the underwater test scenes, the Kd
+    fitting and turbidity sweep, the convergence study, the Secchi-disk cross-check, and the plotting
+    pipeline.</li>
+  <li>Both members merged and verified the two halves together and shared the report, demo, and video
+    equally.</li>
 </ul>
 
 </body>
