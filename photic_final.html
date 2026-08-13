@@ -47,8 +47,9 @@
   forward-biased Henyey-Greenstein phase function with an adjustable asymmetry parameter. On top of the
   renderer we built a measurement layer that fits the diffuse attenuation coefficient Kd off the
   rendered images and compares it against the analytic single-scattering prediction. Our central result
-  is that measured Kd falls below the naive prediction on every color channel, and the gap widens with
-  turbidity, which is the signature of multiple scattering returning light to the beam. We also study
+  is that measured Kd falls below the naive prediction by a margin that grows with turbidity, from
+  agreement within measurement noise in clear water to roughly a third lower on every channel at the
+  highest turbidity, which is the signature of multiple scattering returning light to the beam. We also study
   how sample count scales with optical depth and derive predicted Secchi-disk visibility depths from the
   measured Kd.
 </p>
@@ -141,7 +142,11 @@
     (true transmittance over the sampling pdf) so the estimator stays unbiased; the same idea covers both
     the "scattered" and "survived to surface" branches.</li>
   <li><strong>Noise at high optical depth.</strong> Deep, turbid water needs many scattering events per
-    path, which raises variance. Russian roulette keeps paths finite; the convergence study below
+    path, which raises variance. Because we sample the free-flight distance at the achromatic mean rate,
+    the lowest-extinction channel (blue) sometimes picks up a large correction weight on a long flight,
+    which shows up as blue-tinted fireflies in the deepest renders. Those are the variance cost of
+    sampling one distance instead of one per wavelength (the spectral-MIS simplification noted above),
+    not a bias in the result. Russian roulette keeps paths finite; the convergence study below
     quantifies how many samples are actually needed.</li>
   <li><strong>Building on Windows.</strong> CGL depends on Freetype, which is not present by default; we
     resolved it through vcpkg and a CMake policy flag for the older CGL build files, and confirmed the
