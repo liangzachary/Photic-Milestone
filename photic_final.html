@@ -242,11 +242,20 @@
 <tr><td>0.30</td><td>0.252</td><td>5.6 - 6.7</td><td>0.232</td><td>6.0 - 7.3</td></tr>
 </table>
 <p>
-  Depths are in the same depth-scale units the Kd fit uses. The measurement code
-  (<code>photic_measure.secchi_depth_range</code>) is in place; a fully rendered visibility experiment,
-  lowering a black-and-white disk until its contrast drops below threshold and reading off the depth, is
-  the natural extension and needs a dedicated disk scene.
+  Depths are in the same depth-scale units the Kd fit uses. We then ran the experiment directly. A new
+  scene (<code>CBsecchi.dae</code>) places a white patch and a black patch side by side on the back wall,
+  at the same height so they receive the same light and differ only in albedo, exactly like the disk. We
+  render it at turbidity 0.15 across increasing depth and measure the Michelson contrast between the two
+  patches. Contrast decays from about 0.65 at the surface and crosses the visibility threshold at a depth
+  scale of roughly 10.4, which sits inside the 8.1 to 11.5 band predicted from the measured Kd, and
+  closest to the blue-channel prediction, exactly as expected since a white target stays visible longest
+  in the least-absorbed band. The rendered disk agrees with the empirical Kd law.
 </p>
+<figure>
+  <img src="images/photic/secchi_contrast.png" alt="Secchi contrast vs depth">
+  <figcaption>White-vs-black patch contrast falling with depth. The shaded band is the Secchi depth
+    predicted from measured Kd (1.4 to 1.7 divided by Kd); the measured crossing lands inside it.</figcaption>
+</figure>
 
 <h2>References</h2>
 <ul>
