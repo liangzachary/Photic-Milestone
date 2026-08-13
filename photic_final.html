@@ -134,7 +134,13 @@
   the phase-function angle against the ray's travel direction directly (peak at <code>cos = 1</code>),
   which flips the sign in the denominator relative to PBRT's <code>wo</code>-frame convention but
   produces identical forward-scattering behavior; we chose it because it made the next-event and
-  continuation code read consistently.
+  continuation code read consistently. Fourth, medium transmittance is applied along the view ray and
+  along the shadow rays from in-volume scattering points, but not along shadow rays cast from surfaces.
+  This is deliberate: keeping surface direct lighting on a single (view) path is what makes the Kd
+  measurement a clean comparison against the single-extinction prediction, since attenuating the light's
+  path to the surface as well would roughly double the measured slope. Transmittance-weighting the
+  surface shadow rays, paired with a measurement that accounts for the extra path length, is natural
+  future work.
 </p>
 
 <h3>Problems encountered</h3>
