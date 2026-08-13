@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Photic Final Report</title>
+<style>
+  body { font-family: -apple-system, "Helvetica Neue", Arial, sans-serif; max-width: 860px; margin: 40px auto; padding: 0 20px; color: #1a1a1a; line-height: 1.55; }
+  h1 { font-size: 2em; margin-bottom: 0; }
+  .subtitle { color: #555; margin-top: 4px; }
+  .teamnames { font-weight: 600; margin: 6px 0 2px; }
+  .links { color: #333; margin: 2px 0 20px; }
+  h2 { margin-top: 34px; font-size: 1.25em; border-bottom: 1px solid #e2e2e2; padding-bottom: 3px; }
+  h3 { margin-top: 22px; font-size: 1.05em; }
+  p { margin: 9px 0; }
+  code { background: #f0f0f0; padding: 1px 5px; border-radius: 3px; font-size: 0.9em; }
+  table { border-collapse: collapse; margin: 14px 0; font-size: 0.92em; }
+  th, td { border: 1px solid #ccc; padding: 5px 13px; text-align: right; }
+  th { background: #f0f4f8; }
+  td:first-child, th:first-child { text-align: left; }
+  figure { margin: 16px 0; text-align: center; }
+  figure img { max-width: 100%; border: 1px solid #ddd; border-radius: 4px; }
+  figcaption { font-size: 0.86em; color: #555; margin-top: 6px; }
+  .imgrow { display: flex; gap: 14px; flex-wrap: wrap; justify-content: center; }
+  .imgrow figure { flex: 0 1 260px; margin: 8px 0; }
+  ul { margin: 9px 0; }
+  li { margin: 4px 0; }
+</style>
+</head>
+<body>
+
+<h1>Photic</h1>
+<div class="subtitle">A volumetric path tracer for underwater light. Final report.</div>
+<p class="teamnames">Zachary Liang &middot; Blair Xu &middot; CS 184, Summer 2026</p>
+<p class="links"><strong>Links:</strong>
+  <a href="VIDEO_URL_HERE">final video</a> &middot;
+  <a href="https://claude.ai/code/artifact/1d70d09f-5662-4121-9950-551ee1abacef">interactive demo</a> &middot;
+  <a href="https://github.com/cal-cs184/hw-3-zach_and_blair">source code</a> &middot;
+  <a href="https://liangzachary.github.io/Photic-Milestone/">milestone</a>
+</p>
+
+<h2>Abstract</h2>
+<p>
+  Photic extends our Homework 3 path tracer to render water as a participating medium, where light is
+  absorbed and scattered continuously along a ray rather than only at surface hits. We model a
+  homogeneous water volume with per-channel (RGB) absorption, particulate scattering, analytic
+  free-flight distance sampling, transmittance-weighted next-event estimation, Russian roulette, and a
+  forward-biased Henyey-Greenstein phase function with an adjustable asymmetry parameter. On top of the
+  renderer we built a measurement layer that fits the diffuse attenuation coefficient Kd off the
+  rendered images and compares it against the analytic single-scattering prediction. Our central result
+  is that measured Kd falls below the naive prediction on every color channel, and the gap widens with
+  turbidity, which is the signature of multiple scattering returning light to the beam. We also study
+  how sample count scales with optical depth and derive predicted Secchi-disk visibility depths from the
+  measured Kd.
+</p>
+
+<h2>Technical approach</h2>
+<p>
+  Everything in stock Homework 3 assumes light travels through vacuum between surfaces, so radiance is
+  constant along a ray and the renderer only decides what happens at intersections. Water breaks that:
+  photons are absorbed and scattered the whole way along the ray. Our approach keeps the HW3 surface
+  pipeline untouched and inserts a medium-aware layer around it, so with no water flag the renderer is
+  byte-for-byte the original.
+</p>
+
+<h3>The medium</h3>
+<p>
+  A new <code>Medium</code> class models a homogeneous body of water: a bounding volume, a per-channel
+  absorption coefficient <code>sigma_a</code>, a wavelength-neutral scattering coefficient
+  <code>sigma_s</code>, and total extinction <code>sigma_t = sigma_a + sigma_s</code>. The bounding box
+  is derived automatically from the loaded scene (the BVH root box), so any existing HW3
+  <code>.dae</code> can be rendered underwater with no new geometry. Two command-line flags control it:
+  <code>-w</code> sets turbidity (particulate <code>sigma_s</code>) and <code>-k</code> a depth scale
+  that multiplies both coefficients, which is physically equivalent to more water because Beer-Lambert
+  depends only on the product of coefficient and distance, and scaling both together preserves the
+  single-scattering albedo so the equivalence holds for all orders of scattering, not just the first.
+</p>
+<p>
+  For each ray we sample a free-flight distance analytically by inverting the exponential transmittance,
+  <code>t = -ln(1 - u) / sigma_t_hat</code>, using the achromatic (mean-of-channels) extinction rate.
+  If the sampled distance falls short of the surface, a scattering event happens inside the water;
+  otherwise the ray survives to the surface and the HW3 result is attenuated by the per-channel
+  transmittance over the segment. This closed-form sampling is exact for a homogeneous medium and needs
+  no ray marching.
+</p>
+
+<h3>Scattering: absorption, next-event estimation, and multiple scattering</h3>
+<p>
+  Absorption is per channel, with red absorbed far faster than blue (the reason deep water is blue). At
+  a scattering point we do next-event estimation: we sample every light directly, weight it by the phase
+  function and by the transmittance accumulated along the shadow ray through the medium (light reaching
+  the point is attenuated on the way in, too). We then continue the path with a Russian-roulette-limited
+  recursive bounce in a newly sampled direction. Because that continuation recurses through the ordinary
+  global-illumination entry point, a ray can scatter many times, so multiple scattering emerges from the
+  recursion rather than being special-cased. Russian roulette (fixed continuation probability) keeps the
+  paths finite at high optical depth.
+</p>
+
+<h3>Henyey-Greenstein phase function</h3>
+<p>
+  A volume scattering event has no surface normal, so the outgoing direction is governed by a phase
+  function of the deflection angle rather than a BSDF. We use Henyey-Greenstein,
+  <code>p(cos) = (1/4pi)(1 - g^2) / (1 + g^2 - 2 g cos)^(3/2)</code>, where <code>cos</code> is the
+  cosine of the angle between the photon's incoming and outgoing travel directions and <code>g</code> in
+  (-1, 1) is the asymmetry: <code>g = 0</code> is isotropic, <code>g &gt; 0</code> forward-scattering
+  (real water is around 0.9). We importance-sample it by analytic inversion of the cosine distribution,
+  so the sampling pdf equals the phase value and the two cancel in the indirect estimator, keeping the
+  same clean structure the isotropic sampler had. For next-event estimation the old constant
+  <code>1/(4pi)</code> is replaced by <code>p(dot(ray.d, wi))</code>, weighting each light direction by
+  its deflection from the ray's travel direction.
+</p>
+<figure>
+  <img src="images/photic/hg_phase_function.png" alt="Henyey-Greenstein phase function for several g" style="max-width:440px;">
+  <figcaption>Henyey-Greenstein phase function for g = 0, 0.5, 0.9 (forward is to the right, each curve
+    normalized to its forward value). Higher g concentrates scattering into a narrow forward lobe.</figcaption>
+</figure>
+
+<h3>How this varies from the references</h3>
+<p>
+  Our estimators follow the volume-scattering treatment in Pharr, Jakob &amp; Humphreys (PBRT) and the
+  survey of Novak et al., but with deliberate simplifications and one convention change. First, we use a
+  three-channel RGB model rather than full spectral rendering; spectral hero-wavelength sampling was
+  scoped as aspirational and left out so the baseline was complete and measurable. Second, PBRT samples
+  free-flight distance per wavelength; we sample once at an achromatic mean rate and apply an exact
+  per-channel correction weight afterward (true transmittance divided by the achromatic sampling pdf),
+  which stays unbiased while avoiding the cost and noise of full spectral distance MIS. Third, we define
+  the phase-function angle against the ray's travel direction directly (peak at <code>cos = 1</code>),
+  which flips the sign in the denominator relative to PBRT's <code>wo</code>-frame convention but
+  produces identical forward-scattering behavior; we chose it because it made the next-event and
+  continuation code read consistently.
+</p>
+
+<h3>Problems encountered</h3>
+<ul>
+  <li><strong>Getting the phase-function convention right.</strong> The scattering-angle sign is easy to
+    invert (forward vs back). Rather than debug it visually, we validated the sampler analytically first:
+    the phase function integrates to 1 over the sphere, the sampled mean cosine equals <code>g</code>,
+    and the sampled 3D directions have mean cosine <code>g</code> about the forward axis. Only then did
+    we render, and the forward glow appeared as expected.</li>
+  <li><strong>Chromatic distance sampling.</strong> Sampling one distance for three channels needs a
+    correction or the result is biased toward the achromatic rate. We derived the per-channel weight
+    (true transmittance over the sampling pdf) so the estimator stays unbiased; the same idea covers both
+    the "scattered" and "survived to surface" branches.</li>
+  <li><strong>Noise at high optical depth.</strong> Deep, turbid water needs many scattering events per
+    path, which raises variance. Russian roulette keeps paths finite; the convergence study below
+    quantifies how many samples are actually needed.</li>
+  <li><strong>Building on Windows.</strong> CGL depends on Freetype, which is not present by default; we
+    resolved it through vcpkg and a CMake policy flag for the older CGL build files, and confirmed the
+    medium renders headless to a file.</li>
+</ul>
+
+<h3>Lessons learned</h3>
+<ul>
+  <li>Validating the math with cheap analytic invariants (normalization, mean cosine) before rendering
+    caught convention mistakes far faster than staring at noisy images.</li>
+  <li>The visible story of underwater light is loss of contrast as much as loss of brightness: turbid
+    water goes milky before it goes dark, which is exactly why a single-scattering model overstates the
+    attenuation.</li>
+  <li>Keeping the medium layer wrapped around the untouched HW3 pipeline made the feature easy to reason
+    about and trivially reversible (no water flag, no change).</li>
+</ul>
+
+<h2>Results</h2>
+
+<h3>Phase function: isotropic vs forward-scattering</h3>
+<p>
+  Rendering the same water (turbidity 0.15, depth scale 4) at three asymmetry values shows the effect
+  directly. At g = 0 the medium is uniformly milky. As g rises, scattering concentrates forward: at
+  g = 0.9 a bright directional glow forms around the light and the surrounding fill drops off, because
+  photons now mostly continue along their travel direction.
+</p>
+<div class="imgrow">
+  <figure><img src="images/photic/hg_g0.0.png" alt="g=0"><figcaption>g = 0 (isotropic)</figcaption></figure>
+  <figure><img src="images/photic/hg_g0.5.png" alt="g=0.5"><figcaption>g = 0.5</figcaption></figure>
+  <figure><img src="images/photic/hg_g0.9.png" alt="g=0.9"><figcaption>g = 0.9 (real water)</figcaption></figure>
+</div>
+
+<h3>Descending through the water</h3>
+<p>
+  Holding turbidity fixed and increasing depth, red drops out first, then green, and the scene collapses
+  toward blue as absorption compounds. Every frame below is a real render.
+</p>
+<figure>
+  <img src="images/photic/photic_dive.gif" alt="animated descent through water" style="max-width:340px;">
+  <figcaption>Descent at turbidity 0.12, g = 0.9: depth scale rising, then falling (looped).</figcaption>
+</figure>
+
+<h3>Kd vs turbidity</h3>
+<p>
+  For each turbidity level we render the scene across increasing depth, fit Kd per channel by a
+  log-linear Beer-Lambert fit, and compare against the analytic single-scattering value
+  <code>Kd = sigma_a + sigma_s</code>.
+</p>
+<figure>
+  <img src="images/photic/kd_vs_turbidity.png" alt="Measured vs analytic Kd across turbidity">
+  <figcaption>Measured Kd (solid) vs analytic single-scattering Kd (dashed) across turbidity, per channel.</figcaption>
+</figure>
+<p>
+  Measured Kd sits below the analytic prediction on every channel, and the gap widens with turbidity:
+  near-agreement in clear water grows to roughly a quarter-to-a-third lower at the highest turbidity we
+  rendered. That growing separation is the multiple-scattering signal. At the lowest turbidity the
+  per-channel differences are only a few percent, within measurement noise, which is the expected
+  agreement in clear water.
+</p>
+<table>
+<tr><th>turbidity</th><th>channel</th><th>measured Kd</th><th>analytic Kd</th><th>reduction</th></tr>
+<tr><td>0.05</td><td>R</td><td>0.345</td><td>0.400</td><td>14%</td></tr>
+<tr><td>0.05</td><td>G</td><td>0.099</td><td>0.100</td><td>1%</td></tr>
+<tr><td>0.05</td><td>B</td><td>0.068</td><td>0.065</td><td>~0% (noise)</td></tr>
+<tr><td>0.15</td><td>R</td><td>0.374</td><td>0.500</td><td>25%</td></tr>
+<tr><td>0.15</td><td>G</td><td>0.173</td><td>0.200</td><td>14%</td></tr>
+<tr><td>0.15</td><td>B</td><td>0.148</td><td>0.165</td><td>11%</td></tr>
+<tr><td>0.30</td><td>R</td><td>0.429</td><td>0.650</td><td>34%</td></tr>
+<tr><td>0.30</td><td>G</td><td>0.252</td><td>0.350</td><td>28%</td></tr>
+<tr><td>0.30</td><td>B</td><td>0.232</td><td>0.315</td><td>26%</td></tr>
+</table>
+
+<h3>Convergence vs optical depth</h3>
+<figure>
+  <img src="images/photic/convergence.png" alt="Convergence vs optical depth">
+  <figcaption>RMSE vs samples per pixel against a 256-spp reference, at optical depth k=1 and k=8.</figcaption>
+</figure>
+<p>
+  Using the highest-sample render as a reference, we plot RMSE against samples per pixel at low and high
+  optical depth. At higher sample counts the deep-water case (k = 8) has a shallower slope and stays
+  noisier at a given sample count, so it needs more samples to reach the same error. Convergence slows
+  as optical depth rises, because each camera ray undergoes more scattering events and carries more
+  variance.
+</p>
+
+<h3>Secchi-disk visibility</h3>
+<p>
+  A Secchi disk is the standard oceanographic visibility instrument, and its depth has a published
+  empirical relationship to Kd (Secchi depth is about 1.4 to 1.7 divided by Kd). From our measured Kd we
+  derive the predicted Secchi depth for the most-transmitted bands (green and blue, which drive how far a
+  white disk stays visible). Predicted visibility falls sharply as turbidity rises, matching the
+  intuition that murkier water is legible over a shorter distance.
+</p>
+<table>
+<tr><th>turbidity</th><th>green Kd</th><th>green Secchi</th><th>blue Kd</th><th>blue Secchi</th></tr>
+<tr><td>0.05</td><td>0.099</td><td>14.1 - 17.2</td><td>0.068</td><td>20.6 - 25.0</td></tr>
+<tr><td>0.15</td><td>0.173</td><td>8.1 - 9.8</td><td>0.148</td><td>9.5 - 11.5</td></tr>
+<tr><td>0.30</td><td>0.252</td><td>5.6 - 6.7</td><td>0.232</td><td>6.0 - 7.3</td></tr>
+</table>
+<p>
+  Depths are in the same depth-scale units the Kd fit uses. The measurement code
+  (<code>photic_measure.secchi_depth_range</code>) is in place; a fully rendered visibility experiment,
+  lowering a black-and-white disk until its contrast drops below threshold and reading off the depth, is
+  the natural extension and needs a dedicated disk scene.
+</p>
+
+<h2>References</h2>
+<ul>
+  <li>Pope &amp; Fry, "Absorption spectrum (380-700 nm) of pure water," Applied Optics 36(33), 1997.</li>
+  <li>Henyey &amp; Greenstein, "Diffuse radiation in the galaxy," Astrophysical Journal 93, 1941.</li>
+  <li>Novak et al., "Monte Carlo Methods for Volumetric Light Transport Simulation," Eurographics STAR, 2018.</li>
+  <li>Pharr, Jakob &amp; Humphreys, Physically Based Rendering (4th ed.), volume scattering chapters.</li>
+  <li>Mobley, Light and Water: Radiative Transfer in Natural Waters, and the Ocean Optics Web Book.</li>
+  <li>Preisendorfer, "Secchi disk science," Limnology and Oceanography 31(5), 1986.</li>
+</ul>
+
+<h2>Contributions</h2>
+<p>
+  <em>Draft split based on the proposal, please confirm and adjust before submission.</em>
+</p>
+<ul>
+  <li><strong>Zachary Liang</strong> led the rendering physics: the medium infrastructure, free-flight
+    distance sampling, transmittance, the Henyey-Greenstein phase function and its importance sampling
+    and validation, the per-channel correction, and the <code>-g</code> control.</li>
+  <li><strong>Blair Xu</strong> led the measurement and analysis: the underwater test scene, the Kd
+    fitting and turbidity sweep, the convergence study, the Secchi relation, and the plotting pipeline.</li>
+  <li>Both members merged and verified the two halves together and produced the report, demo, and video.</li>
+</ul>
+
+</body>
+</html>
